@@ -1,0 +1,18 @@
+#pragma prefix "main_1_5"
+#include "included_data.idl"
+
+module MMAIN
+{
+    typedef sequence<MINC::included_data> included_seq;
+
+    struct main_data
+    {
+	long version;
+	included_seq data;
+    };
+};
+
+interface store
+{
+    MMAIN::main_data get_data();
+};

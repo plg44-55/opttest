@@ -1,0 +1,13 @@
+#pragma prefix "included_3_9"
+
+module MINC
+{
+    enum STEP { zero, five };
+		//, six, seven };
+    struct included_data
+    {
+	long data_key;
+	string desc;
+	STEP stp;
+    };
+};
