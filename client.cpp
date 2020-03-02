@@ -2,6 +2,7 @@
 #include <fstream>
 #include <vector>
 #include <map>
+#include <set>
 #include <string.h>
 #include <OB/CORBA.h>
 #include <OB/Codec.h>
@@ -376,7 +377,7 @@ main(int argc, char* argv[])
 
     m_orb = CORBA::ORB_init(argc, argv);
     MMAIN::main_data md;
-    CORBA::String_var fname = CORBA::string_dup("optns");
+    CORBA::String_var fname = "optns";
 
     try
     {
@@ -389,13 +390,13 @@ main(int argc, char* argv[])
 	    md.version = 5;
 	    md.data.length(3);
 	    md.data[0].data_key = 0x77;
-	    md.data[0].desc = CORBA::string_dup("one");
+	    md.data[0].desc = "one";
 	    md.data[0].stp = MINC::five;
 	    md.data[1].data_key = 0x77;
-	    md.data[1].desc = CORBA::string_dup("two");
+	    md.data[1].desc = "two";
 	    md.data[1].stp = MINC::five;
 	    md.data[2].data_key = 0x77;
-	    md.data[2].desc = CORBA::string_dup("this is very very very looooong stringgg!");
+	    md.data[2].desc = "this is very very very looooong stringgg!";
 	    md.data[2].stp = MINC::five;
 	}
 	else
@@ -504,6 +505,15 @@ compare(const char* fname, const CORBA::Any& current_any)
     }
 }
 
+std::string
+get_id(CORBA::TypeCode_ptr tc)
+{
+    using namespace CORBA;
+    const std::set<TCKind> can { tk_objref, tk_struct, tk_union, tk_enum, tk_alias, tk_except };
+    std::string _r = can.count(tc->kind()) ? tc->id() : " -- ";
+    return _r;
+}
+
 any_tree
 get_tree(DynamicAny::DynAny_ptr a, unsigned level)
 {
@@ -513,7 +523,7 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level)
     CORBA::TypeCode_var tc = a->type();
     tc = OB::GetOrigType(tc);
     CORBA::TCKind kind = tc->kind();
-    std::cout << " kind " << kind << std::endl;
+    std::cout << " kind " << kind << ", " << get_id(tc) << std::endl;
     // while( kind == CORBA::tk_alias )
     // {
     // 	ostr_ << ' ' << tc -> name() << ';';
@@ -744,11 +754,11 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level)
 	    DynamicAny::DynStruct::_narrow(a);
 
         CORBA::ULong member_count = tc -> member_count();
-	ostr_ << "It's struct, members: " << member_count << std::endl;
+	ostr_ << "It's struct, members: " << member_count << " /// ";
         for(CORBA::ULong i = 0 ; i < member_count ; i++)
 	{
 	    CORBA::String_var member_name = dyn_struct -> current_member_name();
-	    ostr_ << member_name << std::endl;
+	    ostr_ << member_name << ", ";
 	    DynamicAny::DynAny_var component = dyn_struct -> current_component();
 	    any_tree nested = get_tree(component, level+1);
 	    at.insert(at.end(), nested.begin(), nested.end());

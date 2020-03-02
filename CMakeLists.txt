@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.7)
 project (options_converter)
 
+message("begin")
+set(MAIN_FILE_OWNER FILE_OWNER sntoss FILE_GROUP users)
+message(${MAIN_FILE_OWNER})
+message(${FILE_OWNER})
+message(${FILE_GROUP})
+
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "-fpermissive")
 set(CORBA_LIBRARIES -L/home/pete/OB.orig/lib -lOB -lJTC -lpthread -ldl)

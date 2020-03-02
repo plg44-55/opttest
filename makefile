@@ -18,7 +18,7 @@ CPPFLAGS = -I/home/pete/tests/OB1/include -I.
 CXXFLAGS = -fpermissive -ggdb -std=gnu++11 -Wno-write-strings
 
 LDFLAGS = -L/home/pete/tests/OB1/lib
-LDLIBS = -lOB -lJTC -lpthread -ldl -lstdc++
+LDLIBS = -Wl,-rpath=/home/pete/tests/OB1/lib -lOB -lJTC -lpthread -ldl -lstdc++
 #LMALLOC = -ltcmalloc
 
 all: ${TARGETS}
