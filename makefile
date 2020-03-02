@@ -1,5 +1,5 @@
-CC = gcc-4.8
-CXX = g++-4.8
+# CC = gcc-4.8
+# CXX = g++-4.8
 
 IDLS =  included_data main_data
 IDL_CLT_SOURCES = $(addsuffix .cpp, ${IDLS}) $(addsuffix .h, ${IDLS})
@@ -14,11 +14,11 @@ CLI_SOU = client.cpp ${IDL_CLT_SOURCES}
 SRV_OBJ = $(patsubst %.h,,${SRV_SOU:.cpp=.o})
 CLI_OBJ = $(patsubst %.h,,${CLI_SOU:.cpp=.o})
 
-CPPFLAGS = -I/home/pete/tests/OB1/include -I.
+CPPFLAGS = -I/home/pete/OB.orig/include -I.
 CXXFLAGS = -fpermissive -ggdb -std=gnu++11 -Wno-write-strings
 
-LDFLAGS = -L/home/pete/tests/OB1/lib
-LDLIBS = -Wl,-rpath=/home/pete/tests/OB1/lib -lOB -lJTC -lpthread -ldl -lstdc++
+LDFLAGS = -L/home/pete/OB.orig/lib
+LDLIBS = -Wl,-rpath=/home/pete/OB.orig/lib -lOB -lJTC -lpthread -ldl -lstdc++
 #LMALLOC = -ltcmalloc
 
 all: ${TARGETS}
@@ -33,6 +33,6 @@ client.cpp: $(addsuffix .h, ${IDLS})
 server.cpp: $(addsuffix .h, ${IDLS}) $(addsuffix _skel.h, ${IDLS})
 
 ${IDL_SOURCES}: $(addsuffix .idl, ${IDLS})
-	LD_LIBRARY_PATH=/home/pete/tests/OB1/lib /home/pete/tests/OB1/bin/idl $(addsuffix .idl, ${IDLS})
+	LD_LIBRARY_PATH=/home/pete/OB.orig/lib /home/pete/OB.orig/bin/idl $(addsuffix .idl, ${IDLS})
 clean:
 	rm -f *.o ${TARGETS} ${IDL_SOURCES} *~
