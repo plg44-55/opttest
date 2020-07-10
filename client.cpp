@@ -228,7 +228,7 @@ getAnyFromFile(const char* fileName)
 struct TypeCodePrefixPair
 {
     CORBA::TypeCode_ptr tc;
-    char* pr;
+    const char* pr;
 };
 
 
@@ -521,9 +521,10 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level)
     a->rewind();
     std::ostringstream ostr_;
     CORBA::TypeCode_var tc = a->type();
+    std::cout << " kind " << tc->kind() << ", " << get_id(tc) << " /// ";
     tc = OB::GetOrigType(tc);
     CORBA::TCKind kind = tc->kind();
-    std::cout << " kind " << kind << ", " << get_id(tc) << std::endl;
+    std::cout << " orig kind " << kind << ", " << get_id(tc) << std::endl;
     // while( kind == CORBA::tk_alias )
     // {
     // 	ostr_ << ' ' << tc -> name() << ';';
@@ -619,7 +620,7 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level)
         // Not all platforms support this
         //
         //ostr_ << v_longdouble;
-        char str[25];
+        char str[64];
         sprintf(str, "%31Lg", v_longdouble);
         ostr_ << str;
 
@@ -723,8 +724,12 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level)
 
     case CORBA::tk_sequence:
     {
+        CORBA::ULong member_count = tc->length();
+	CORBA::TypeCode_ptr itc = tc->content_type();
         DynamicAny::DynSequence_var dyn_sequence = DynamicAny::DynSequence::_narrow(a);
 	ostr_ << "It's sequence, length: " << dyn_sequence->get_length();
+	ostr_ << " alternative: " << member_count;
+	ostr_ << " and type " << get_id(itc);
         for( CORBA::ULong i = 0 ; i < dyn_sequence -> get_length() ; i++)
 	{
             DynamicAny::DynAny_var component = dyn_sequence -> current_component();
@@ -760,6 +765,7 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level)
 	    CORBA::String_var member_name = dyn_struct -> current_member_name();
 	    ostr_ << member_name << ", ";
 	    DynamicAny::DynAny_var component = dyn_struct -> current_component();
+	    std::cout << "field name: " << member_name << "    ";
 	    any_tree nested = get_tree(component, level+1);
 	    at.insert(at.end(), nested.begin(), nested.end());
             //show_DynAny(component);
@@ -834,6 +840,9 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level)
 void
 show_tree(const any_tree& at)
 {
-    for( auto& a : at )
-	std::cout << a.level << ", " << a.kind << " - " << a.attr << std::endl;
+    std::cout << "The TREE:\n";
+    // for( auto& a : at )
+    // 	std::cout << a.level << ", " << a.kind << " - " << a.attr << std::endl;
+    for( auto a = at.rbegin(); a != at.rend(); ++a )
+     	std::cout << a->level << ", " << a->kind << " - " << a->attr << std::endl;
 }
