@@ -17,7 +17,7 @@ endmacro()
 set(IDLS main_data included_data)
 #set(IDLS main_data)
 set(CMAKE_CXX_STANDARD 11)
-set(MY_FLAGS -fpermissive -Wno-deprecated)
+set(MY_FLAGS -fpermissive -Wno-deprecated -g)
 set(CORBA_PREFIX /home/pete/tests/OB1)
 set(CORBA_LIBRARIES -Wl,-rpath=${CORBA_PREFIX}/lib -L${CORBA_PREFIX}/lib -lOB -lJTC -lpthread -ldl)
 

@@ -1,6 +1,6 @@
 #include <iostream>
 #include <fstream>
-#include <vector>
+#include <deque>
 #include <map>
 #include <set>
 #include <string.h>
@@ -466,11 +466,12 @@ struct any_tree_elt
     std::string id;
     std::string field_name;
     std::string attr;
+    any_tree_elt* parent = nullptr;
     any_tree_elt(unsigned l, CORBA::TCKind k, std::string _id, std::string _fn, std::string s) :
 	level(l), kind(k), id(_id), field_name(_fn), attr(s) { }
 };
 
-using any_tree = std::vector<any_tree_elt>;
+using any_tree = std::deque<any_tree_elt>;
 
 void
 show_tree(const any_tree&);
@@ -536,6 +537,8 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level, std::string field_name)
     // }
 
     any_tree at;
+    any_tree_elt ate { level, kind, id, field_name, "" };
+    at.push_back(ate);
 
     switch(kind)
     {
@@ -835,8 +838,9 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level, std::string field_name)
 
     a -> rewind();
 
-    any_tree_elt ate { level, kind, id, field_name, ostr_.str() };
-    at.push_back(ate);
+    at[0].attr = ostr_.str();
+    //std::cout << "\ndebug: " << ostr_.str() << "\n";
+
     return at;
 }
 
@@ -846,6 +850,6 @@ show_tree(const any_tree& at)
     std::cout << "The TREE:\n";
     // for( auto& a : at )
     // 	std::cout << a.level << ", " << a.kind << " - " << a.attr << std::endl;
-    for( auto a = at.rbegin(); a != at.rend(); ++a )
-     	std::cout << a->level << ", " << a->kind << ", " << a->field_name << ", " << a->id << " === " << a->attr << std::endl;
+    for( auto a = at.begin(); a != at.end(); ++a )
+     	std::cout << a->level << ", " << a->kind << ", " << a->field_name << ", " << a->id << "    ===    " << a->attr << std::endl;
 }
