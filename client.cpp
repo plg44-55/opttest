@@ -479,6 +479,9 @@ any_tree
 get_tree(DynamicAny::DynAny_ptr, unsigned l = 0, std::string n = "--");
 
 void
+fill_new(DynamicAny::DynAny_ptr a_old, const any_tree& tree, DynamicAny::DynAny_ptr a_new, unsigned l = 0);
+
+void
 compare(const char* fname, const CORBA::Any& current_any)
 {
     try
@@ -489,16 +492,25 @@ compare(const char* fname, const CORBA::Any& current_any)
 	CORBA::Object_var factory_obj = m_orb->resolve_initial_references("DynAnyFactory");
 	DynamicAny::DynAnyFactory_var factory = DynamicAny::DynAnyFactory::_narrow(factory_obj);
 
-	DynamicAny::DynAny_var dyn_any1 = factory->create_dyn_any(f_any);
-	//DynamicAny::DynAny_var dyn_any1 = factory->create_dyn_any_without_truncation(f_any);
-	any_tree old_tree = get_tree(dyn_any1);
-	show_tree(old_tree);
-
-	std::cout << "----------------------------------\n";
 	DynamicAny::DynAny_var dyn_any = factory->create_dyn_any(current_any);
 	any_tree new_tree = get_tree(dyn_any);
 	show_tree(new_tree);
 
+	std::cout << "----------------------------------\n";
+
+	DynamicAny::DynAny_var dyn_any1 = factory->create_dyn_any(f_any);
+	//DynamicAny::DynAny_var dyn_any1 = factory->create_dyn_any_without_truncation(f_any);
+
+	// any_tree old_tree = get_tree(dyn_any1);
+	// show_tree(old_tree);
+
+	// may be:
+	// class c_dyn_any:
+	//   c_dyn_any(dyn_any)
+	//   c_dyn_any.get_tree()
+	//   c_dyn_any.fill_new(dyn_any1);
+	//   dyn_any = c_dyn_any.get_filled();
+	fill_new(dyn_any, new_tree, dyn_any1);
 	// compare
     }
     catch(...)
@@ -758,8 +770,7 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level, std::string field_name)
 
     case CORBA::tk_struct:
     {
-        DynamicAny::DynStruct_var dyn_struct =
-	    DynamicAny::DynStruct::_narrow(a);
+        DynamicAny::DynStruct_var dyn_struct = DynamicAny::DynStruct::_narrow(a);
 
         CORBA::ULong member_count = tc -> member_count();
 	ostr_ << "It's struct, members: " << member_count << " /// ";
@@ -767,6 +778,7 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level, std::string field_name)
 	{
 	    CORBA::String_var member_name = dyn_struct -> current_member_name();
 	    ostr_ << member_name << ", ";
+
 	    DynamicAny::DynAny_var component = dyn_struct -> current_component();
 	    std::cout << "field name: " << member_name << "    ";
 	    any_tree nested = get_tree(component, level+1, member_name.in());
@@ -848,4 +860,320 @@ show_tree(const any_tree& at)
     // 	std::cout << a.level << ", " << a.kind << " - " << a.attr << std::endl;
     for( auto a = at.rbegin(); a != at.rend(); ++a )
      	std::cout << a->level << ", " << a->kind << ", " << a->field_name << ", " << a->id << " === " << a->attr << std::endl;
+}
+
+void
+fill_new(DynamicAny::DynAny_ptr a_new, const any_tree& tree, DynamicAny::DynAny_ptr a_old, unsigned level)
+{
+    std::cout << "filling enter level " << level;
+    a_old->rewind();
+    CORBA::TypeCode_var tc = a_old->type();
+    std::cout << " kind " << tc->kind() << ", " << get_id(tc) << " /// ";
+    tc = OB::GetOrigType(tc);
+    CORBA::TCKind kind = tc->kind();
+    std::cout << " orig kind " << kind << ", " << get_id(tc) << std::endl;
+
+    // find current a_old in tree and place in a_new and old value in a_new
+    // place = find_in_tree(tree, get_type_name_?Value?(a_old)
+    // a_new.seek(place)
+    // a_new.insert(Value)
+
+
+    switch(kind)
+    {
+    case CORBA::tk_objref:
+    {
+        ostr_ << tc -> id();
+	CORBA::Object_ptr v_obj = a->get_reference();
+        if(CORBA::is_nil(v_obj))
+            ostr_ << "<NULL>";
+
+	break;
+    }
+
+    case CORBA::tk_short:
+    {
+        CORBA::Short v_short = a -> get_short();
+        ostr_ << v_short;
+
+	break;
+    }
+
+    case CORBA::tk_ushort:
+    {
+        CORBA::UShort v_ushort = a -> get_ushort();
+        ostr_ << v_ushort;
+
+	break;
+    }
+
+    case CORBA::tk_long:
+    {
+        CORBA::Long v_long = a -> get_long();
+        ostr_ << v_long;
+
+	break;
+    }
+
+    case CORBA::tk_ulong:
+    {
+        CORBA::ULong v_ulong = a -> get_ulong();
+        ostr_ << v_ulong;
+
+	break;
+    }
+
+    case CORBA::tk_longlong:
+    {
+        CORBA::LongLong v_longlong = a -> get_longlong();
+        CORBA::String_var str = OB::LongLongToString(v_longlong);
+        ostr_ << str;
+
+	break;
+    }
+
+    case CORBA::tk_ulonglong:
+    {
+        CORBA::ULongLong v_ulonglong = a -> get_ulonglong();
+        CORBA::String_var str = OB::ULongLongToString(v_ulonglong);
+        ostr_ << str;
+
+	break;
+    }
+
+    case CORBA::tk_float:
+    {
+        CORBA::Float v_float = a -> get_float();
+        ostr_ << v_float;
+
+	break;
+    }
+
+    case CORBA::tk_double:
+    {
+        CORBA::Double v_double = a -> get_double();
+        ostr_ << v_double;
+
+	break;
+    }
+
+#if SIZEOF_LONG_DOUBLE >= 12
+    case CORBA::tk_longdouble:
+    {
+        CORBA::LongDouble v_longdouble = a -> get_longdouble();
+        //
+        // Not all platforms support this
+        //
+        //ostr_ << v_longdouble;
+        char str[64];
+        sprintf(str, "%31Lg", v_longdouble);
+        ostr_ << str;
+
+	break;
+    }
+#endif
+
+    case CORBA::tk_boolean:
+    {
+        CORBA::Boolean v_boolean = a -> get_boolean();
+        if(v_boolean == true)
+	    ostr_ << "TRUE";
+        else if(v_boolean == false)
+	    ostr_ << "FALSE";
+        else
+	    ostr_ << "UNKNOWN_BOOLEAN";
+
+	break;
+    }
+
+    case CORBA::tk_octet:
+    {
+        CORBA::Octet v_octet = a -> get_octet();
+        ostr_ << static_cast<int>(v_octet);
+
+	break;
+    }
+
+    case CORBA::tk_char:
+    {
+        CORBA::Char v_char = a -> get_char();
+        ostr_ << "'" << static_cast<char>(v_char) << "'";
+
+	break;
+    }
+
+    case CORBA::tk_string:
+    {
+        CORBA::String_var v_string = a -> get_string();
+        ostr_ << '"' << v_string << '"';
+
+	break;
+    }
+
+    case CORBA::tk_wchar:
+    {
+        CORBA::WChar v_wchar = a -> get_wchar();
+	//
+	// Output of narrowed wchar to narrow stream
+	//
+	ostr_ << "'" << static_cast<char>(v_wchar) << "' - narrowed";
+
+	break;
+    }
+
+    case CORBA::tk_wstring:
+    {
+        CORBA::WString_var v_wstring = a -> get_wstring();
+	//
+	// Output of narrowed wstring to narrow stream
+	//
+	ostr_ << '"';
+	for (CORBA::ULong i=0; i < OB::wcslen(v_wstring); i++)
+	{
+	    ostr_ << static_cast<char>(v_wstring[i]);
+	}
+	ostr_ <<  '"' << " - narrowed";
+
+	break;
+    }
+
+    case CORBA::tk_TypeCode: {
+        CORBA::TypeCode_var v_tc = a -> get_typecode();
+        //show_name_TypeCode(v_tc);
+
+	break;
+    }
+
+    case CORBA::tk_any:
+    {
+        CORBA::Any_var v_any = a -> get_any();
+        //show_Any(v_any);
+	ostr_ << "It's ANY";
+	break;
+    }
+
+    case CORBA::tk_array:
+    {
+        DynamicAny::DynArray_var dyn_array = DynamicAny::DynArray::_narrow(a);
+        // for(i = 0 ; i < tc -> length() ; i++)
+	// {
+        //     if(i != 0) ostr_ << ", ";
+        //     DynAny_var component = dyn_array -> current_component();
+	//     show_DynAny(component);
+	//     dyn_array -> next();
+	// }
+	ostr_ << "It's Arrray, length: " << tc->length();
+
+	break;
+    }
+
+    case CORBA::tk_sequence:
+    {
+        CORBA::ULong member_count = tc->length();
+	CORBA::TypeCode_ptr itc = tc->content_type();
+        DynamicAny::DynSequence_var dyn_sequence = DynamicAny::DynSequence::_narrow(a);
+	ostr_ << "It's sequence, length: " << dyn_sequence->get_length();
+	ostr_ << " alternative: " << member_count;
+	ostr_ << " and type " << get_id(itc);
+        for( CORBA::ULong i = 0 ; i < dyn_sequence -> get_length() ; i++)
+	{
+            DynamicAny::DynAny_var component = dyn_sequence -> current_component();
+	    any_tree nested = get_tree(component, level+1);
+	    at.insert(at.end(), nested.begin(), nested.end());
+
+            dyn_sequence -> next();
+	}
+
+	break;
+    }
+
+    case CORBA::tk_enum:
+    {
+	DynamicAny::DynEnum_var dyn_enum = DynamicAny::DynEnum::_narrow(a);
+	CORBA::String_var v_string = dyn_enum -> get_as_string();
+	ostr_ << v_string;
+	CORBA::ULong v_ul = dyn_enum -> get_as_ulong();
+	ostr_ << " / " << v_ul;
+
+	break;
+    }
+
+    case CORBA::tk_struct:
+    {
+        DynamicAny::DynStruct_var dyn_struct =
+	    DynamicAny::DynStruct::_narrow(a);
+
+        CORBA::ULong member_count = tc -> member_count();
+	ostr_ << "It's struct, members: " << member_count << " /// ";
+        for(CORBA::ULong i = 0 ; i < member_count ; i++)
+	{
+	    CORBA::String_var member_name = dyn_struct -> current_member_name();
+	    ostr_ << member_name << ", ";
+	    DynamicAny::DynAny_var component = dyn_struct -> current_component();
+	    std::cout << "field name: " << member_name << "    ";
+	    any_tree nested = get_tree(component, level+1);
+	    at.insert(at.end(), nested.begin(), nested.end());
+            //show_DynAny(component);
+            dyn_struct -> next();
+        }
+
+	break;
+    }
+
+    case CORBA::tk_union:
+    {
+        DynamicAny::DynUnion_var dyn_union = DynamicAny::DynUnion::_narrow(a);
+        DynamicAny::DynAny_var component = dyn_union -> current_component();
+
+        // skip() << "discriminator = ";
+        // show_DynAny(component);
+        // ostr_ << OB_ENDL;
+
+        // if(dyn_union -> component_count() == 2)
+        // {
+        //     dyn_union -> next();
+
+        //     component = dyn_union -> current_component();
+
+        //     String_var member_name = dyn_union -> member_name();
+        //     skip() << member_name << " = ";
+        //     show_DynAny(component);
+
+        //     ostr_ << OB_ENDL;
+        // }
+	ostr_ << "It's union, components: " << dyn_union->component_count();
+
+	break;
+    }
+
+    case CORBA::tk_fixed:
+    {
+	DynamicAny::DynFixed_var dyn_fixed = DynamicAny::DynFixed::_narrow(a);
+
+        CORBA::String_var str = dyn_fixed -> get_value();
+	ostr_ << str;
+
+	break;
+    }
+
+    // case CORBA::tk_alias:
+    // {
+    // 	ostr_ << "It's alias: " << tc->name();
+
+    //     // TypeCode_var content_type = tc -> content_type();
+    //     // show_name_TypeCode(content_type);
+    //     // ostr_ << ' ' << tc -> name() << ';';
+
+    // 	break;
+    // }
+
+    default:
+    {
+        assert(false);
+
+        break;
+    }
+    }
+
+    a -> rewind();
 }
