@@ -463,9 +463,11 @@ struct any_tree_elt
 {
     unsigned level;
     CORBA::TCKind kind;
+    std::string id;
+    std::string field_name;
     std::string attr;
-    any_tree_elt(unsigned l, CORBA::TCKind k, std::string s) :
-	level(l), kind(k), attr(s) { }
+    any_tree_elt(unsigned l, CORBA::TCKind k, std::string _id, std::string _fn, std::string s) :
+	level(l), kind(k), id(_id), field_name(_fn), attr(s) { }
 };
 
 using any_tree = std::vector<any_tree_elt>;
@@ -474,7 +476,7 @@ void
 show_tree(const any_tree&);
 
 any_tree
-get_tree(DynamicAny::DynAny_ptr, unsigned l = 0);
+get_tree(DynamicAny::DynAny_ptr, unsigned l = 0, std::string n = "--");
 
 void
 compare(const char* fname, const CORBA::Any& current_any)
@@ -515,13 +517,14 @@ get_id(CORBA::TypeCode_ptr tc)
 }
 
 any_tree
-get_tree(DynamicAny::DynAny_ptr a, unsigned level)
+get_tree(DynamicAny::DynAny_ptr a, unsigned level, std::string field_name)
 {
     std::cout << "enter level " << level;
     a->rewind();
     std::ostringstream ostr_;
     CORBA::TypeCode_var tc = a->type();
-    std::cout << " kind " << tc->kind() << ", " << get_id(tc) << " /// ";
+    std::string id = get_id(tc);
+    std::cout << " kind " << tc->kind() << ", " << id << " /// ";
     tc = OB::GetOrigType(tc);
     CORBA::TCKind kind = tc->kind();
     std::cout << " orig kind " << kind << ", " << get_id(tc) << std::endl;
@@ -766,7 +769,7 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level)
 	    ostr_ << member_name << ", ";
 	    DynamicAny::DynAny_var component = dyn_struct -> current_component();
 	    std::cout << "field name: " << member_name << "    ";
-	    any_tree nested = get_tree(component, level+1);
+	    any_tree nested = get_tree(component, level+1, member_name.in());
 	    at.insert(at.end(), nested.begin(), nested.end());
             //show_DynAny(component);
             dyn_struct -> next();
@@ -832,7 +835,7 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level)
 
     a -> rewind();
 
-    any_tree_elt ate { level, kind, ostr_.str() };
+    any_tree_elt ate { level, kind, id, field_name, ostr_.str() };
     at.push_back(ate);
     return at;
 }
@@ -844,5 +847,5 @@ show_tree(const any_tree& at)
     // for( auto& a : at )
     // 	std::cout << a.level << ", " << a.kind << " - " << a.attr << std::endl;
     for( auto a = at.rbegin(); a != at.rend(); ++a )
-     	std::cout << a->level << ", " << a->kind << " - " << a->attr << std::endl;
+     	std::cout << a->level << ", " << a->kind << ", " << a->field_name << ", " << a->id << " === " << a->attr << std::endl;
 }
