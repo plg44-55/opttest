@@ -3,6 +3,7 @@
 #include <deque>
 #include <map>
 #include <set>
+#include <algorithm>
 #include <string.h>
 #include <OB/CORBA.h>
 #include <OB/Codec.h>
@@ -480,38 +481,38 @@ any_tree
 get_tree(DynamicAny::DynAny_ptr, unsigned l = 0, std::string n = "--");
 
 void
-fill_new(DynamicAny::DynAny_ptr a_old, const any_tree& tree, DynamicAny::DynAny_ptr a_new, unsigned l = 0);
+fill_new(DynamicAny::DynAny_ptr a_old, const any_tree& tree, DynamicAny::DynAny_ptr a_new, unsigned l = 0, std::string field_name = "");
 
 void
-compare(const char* fname, const CORBA::Any& current_any)
+compare(const char* fname, const CORBA::Any& present_any)
 {
     try
     {
 	CORBA::OctetSeq_var f_stream = getStreamFromFile(fname);
-	CORBA::Any_var f_any = getAnyFromStream(f_stream);
+	CORBA::Any_var file_any = getAnyFromStream(f_stream);
 
 	CORBA::Object_var factory_obj = m_orb->resolve_initial_references("DynAnyFactory");
 	DynamicAny::DynAnyFactory_var factory = DynamicAny::DynAnyFactory::_narrow(factory_obj);
 
-	DynamicAny::DynAny_var dyn_any = factory->create_dyn_any(current_any);
-	any_tree new_tree = get_tree(dyn_any);
-	show_tree(new_tree);
+	DynamicAny::DynAny_var present_data = factory->create_dyn_any(present_any);
+	any_tree present_tree = get_tree(present_data);
+	show_tree(present_tree);
 
 	std::cout << "----------------------------------\n";
 
-	DynamicAny::DynAny_var dyn_any1 = factory->create_dyn_any(f_any);
-	//DynamicAny::DynAny_var dyn_any1 = factory->create_dyn_any_without_truncation(f_any);
+	DynamicAny::DynAny_var file_data = factory->create_dyn_any(file_any);
+	//DynamicAny::DynAny_var file_data = factory->create_dyn_any_without_truncation(file_any);
 
-	// any_tree old_tree = get_tree(dyn_any1);
+	// any_tree old_tree = get_tree(file_data);
 	// show_tree(old_tree);
 
 	// may be:
 	// class c_dyn_any:
 	//   c_dyn_any(dyn_any)
 	//   c_dyn_any.get_tree()
-	//   c_dyn_any.fill_new(dyn_any1);
+	//   c_dyn_any.fill_new(file_data);
 	//   dyn_any = c_dyn_any.get_filled();
-	fill_new(dyn_any, new_tree, dyn_any1);
+	fill_new(present_data, present_tree, file_data);
 	// compare
     }
     catch(...)
@@ -752,6 +753,7 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level, std::string field_name)
 	{
             DynamicAny::DynAny_var component = dyn_sequence -> current_component();
 	    any_tree nested = get_tree(component, level+1);
+	    std::for_each(nested.begin(), nested.end(), [&at](any_tree_elt& e) { e.parent = &at[0]; });
 	    at.insert(at.end(), nested.begin(), nested.end());
 
             dyn_sequence -> next();
@@ -785,6 +787,7 @@ get_tree(DynamicAny::DynAny_ptr a, unsigned level, std::string field_name)
 	    DynamicAny::DynAny_var component = dyn_struct -> current_component();
 	    std::cout << "field name: " << member_name << "    ";
 	    any_tree nested = get_tree(component, level+1, member_name.in());
+	    std::for_each(nested.begin(), nested.end(), [&at](any_tree_elt& e) { e.parent = &at[0]; });
 	    at.insert(at.end(), nested.begin(), nested.end());
             //show_DynAny(component);
             dyn_struct -> next();
@@ -866,11 +869,62 @@ show_tree(const any_tree& at)
      	std::cout << a->level << ", " << a->kind << ", " << a->field_name << ", " << a->id << "    ===    " << a->attr << std::endl;
 }
 
+unsigned
+find_in_tree(const any_tree& tree, any_tree_elt elt, stack s)
+{
+    // find in tree elt.level elt.kind ( elt.id || elt.field_name) and check stack
+
+    return index;
+}
+
+DynamicAny::DynAny_ptr
+seek(DynamicAny::DynAny_ptr s, stack stack, unsigned level)
+{
+    unsigned last_level = stack.last().level;
+    //s->rewind();
+    e = stack[level];
+    CORBA::TypeCode_var tc = s->type();
+    //std::cout << " kind " << tc->kind() << ", " << get_id(tc) << " /// ";
+    tc = OB::GetOrigType(tc);
+    CORBA::TCKind kind = tc->kind();
+    //std::cout << " orig kind " << kind << ", " << get_id(tc) << std::endl;
+    std::string id = get_id(tc);
+    std::string field_name = "";
+    any_tree_elt elt { level, kind, id, field_name, "" };
+    // compare(elt, e)
+    if( level == last_level )
+	return s;
+    if( kind == CORBA::tk_struct )
+    {
+        DynamicAny::DynStruct_var component = DynamicAny::DynStruct::_narrow(s);
+	component->rewind();
+	e = stack[level+1];
+
+        CORBA::ULong member_count = component->member_count();
+	//ostr_ << "It's struct, members: " << member_count << " /// ";
+        for(CORBA::ULong i = 0 ; i < member_count ; i++)
+	{
+	    CORBA::String_var member_name = component->current_member_name();
+	    //ostr_ << member_name << ", ";
+	    if( member_name == e.member_name )
+	    {
+		DynamicAny::DynAny_var child_component = component->current_component();
+		//std::cout << "field name: " << member_name << "    ";
+
+		return seek(child_component, stack, level+1);
+	    }
+            old_struct -> next();
+	}
+
+    }
+}
+
 void
-fill_new(DynamicAny::DynAny_ptr a_new, const any_tree& tree, DynamicAny::DynAny_ptr a_old, unsigned level)
+fill_new(DynamicAny::DynAny_ptr a_new, const any_tree& tree, DynamicAny::DynAny_ptr a_old,
+	 unsigned level, std::string field_name, stack stack)
 {
     std::cout << "filling enter level " << level;
-    a_old->rewind();
+    //a_old->rewind();
     CORBA::TypeCode_var tc = a_old->type();
     std::cout << " kind " << tc->kind() << ", " << get_id(tc) << " /// ";
     tc = OB::GetOrigType(tc);
@@ -878,13 +932,56 @@ fill_new(DynamicAny::DynAny_ptr a_new, const any_tree& tree, DynamicAny::DynAny_
     std::cout << " orig kind " << kind << ", " << get_id(tc) << std::endl;
 
     // find current a_old in tree and place in a_new and old value in a_new
-    // place = find_in_tree(tree, get_type_name_?Value?(a_old)
+    any_tree_elt elt { level, kind, id, field_name, "" };
+    unsigned place = find_in_tree(tree, elt, stack);
+    if( !place )
+	return;
+    stack.push(place);
     // a_new.seek(place)
+    // seek for TC id ? no
+    DynamicAny::DynAny_var elt_new = seek(a_new, stack);
     // a_new.insert(Value)
+    if( CORBA::is_nil(elt_new) )
+	return;
 
 
     switch(kind)
     {
+    case CORBA::tk_struct:
+    {
+        DynamicAny::DynStruct_var old_struct = DynamicAny::DynStruct::_narrow(a_old);
+	old_struct->rewind();
+
+        CORBA::ULong member_count = old_struct->member_count();
+	//ostr_ << "It's struct, members: " << member_count << " /// ";
+        for(CORBA::ULong i = 0 ; i < member_count ; i++)
+	{
+	    CORBA::String_var member_name = old_struct->current_member_name();
+	    //ostr_ << member_name << ", ";
+	    DynamicAny::DynAny_var component = old_struct->current_component();
+	    //std::cout << "field name: " << member_name << "    ";
+
+	    fill_new(a_new, tree, component, level+1, member_name, stack);
+            old_struct -> next();
+        }
+
+	break;
+    }
+
+    case CORBA::tk_long:
+    {
+        CORBA::Long t_ = a_old->get_long();
+	elt_new->insert_long(t_);
+	break;
+    }
+
+    case CORBA::tk_string:
+    {
+        CORBA::String_var t_ = a_old->get_string();
+	elt_new->insert_string(t_);
+	break;
+    }
+
     case CORBA::tk_objref:
     {
         ostr_ << tc -> id();
@@ -907,14 +1004,6 @@ fill_new(DynamicAny::DynAny_ptr a_new, const any_tree& tree, DynamicAny::DynAny_
     {
         CORBA::UShort v_ushort = a -> get_ushort();
         ostr_ << v_ushort;
-
-	break;
-    }
-
-    case CORBA::tk_long:
-    {
-        CORBA::Long v_long = a -> get_long();
-        ostr_ << v_long;
 
 	break;
     }
@@ -1002,14 +1091,6 @@ fill_new(DynamicAny::DynAny_ptr a_new, const any_tree& tree, DynamicAny::DynAny_
     {
         CORBA::Char v_char = a -> get_char();
         ostr_ << "'" << static_cast<char>(v_char) << "'";
-
-	break;
-    }
-
-    case CORBA::tk_string:
-    {
-        CORBA::String_var v_string = a -> get_string();
-        ostr_ << '"' << v_string << '"';
 
 	break;
     }
@@ -1102,24 +1183,337 @@ fill_new(DynamicAny::DynAny_ptr a_new, const any_tree& tree, DynamicAny::DynAny_
 	break;
     }
 
+    case CORBA::tk_union:
+    {
+        DynamicAny::DynUnion_var dyn_union = DynamicAny::DynUnion::_narrow(a);
+        DynamicAny::DynAny_var component = dyn_union -> current_component();
+
+        // skip() << "discriminator = ";
+        // show_DynAny(component);
+        // ostr_ << OB_ENDL;
+
+        // if(dyn_union -> component_count() == 2)
+        // {
+        //     dyn_union -> next();
+
+        //     component = dyn_union -> current_component();
+
+        //     String_var member_name = dyn_union -> member_name();
+        //     skip() << member_name << " = ";
+        //     show_DynAny(component);
+
+        //     ostr_ << OB_ENDL;
+        // }
+	ostr_ << "It's union, components: " << dyn_union->component_count();
+
+	break;
+    }
+
+    case CORBA::tk_fixed:
+    {
+	DynamicAny::DynFixed_var dyn_fixed = DynamicAny::DynFixed::_narrow(a);
+
+        CORBA::String_var str = dyn_fixed -> get_value();
+	ostr_ << str;
+
+	break;
+    }
+
+    // case CORBA::tk_alias:
+    // {
+    // 	ostr_ << "It's alias: " << tc->name();
+
+    //     // TypeCode_var content_type = tc -> content_type();
+    //     // show_name_TypeCode(content_type);
+    //     // ostr_ << ' ' << tc -> name() << ';';
+
+    // 	break;
+    // }
+
+    default:
+    {
+        assert(false);
+
+        break;
+    }
+    }
+
+    a -> rewind();
+}
+
+void
+fill_new1(DynamicAny::DynAny_ptr a_new, DynamicAny::DynAny_ptr a_old);
+{
+    //std::cout << "filling enter level " << level;
+    //a_old->rewind();
+    CORBA::TypeCode_var tc_old = a_old->type();
+    std::cout << " kind " << tc_old->kind() << ", " << get_id(tc_old) << " /// ";
+    tc_old = OB::GetOrigType(tc_old);
+    CORBA::TCKind kind_old = tc_old->kind();
+    std::cout << " orig kind " << kind_old << ", " << get_id(tc_old) << std::endl;
+
+    CORBA::TypeCode_var tc_new = a_new->type();
+    std::cout << " kind " << tc_new->kind() << ", " << get_id(tc_new) << " /// ";
+    tc_new = OB::GetOrigType(tc_new);
+    CORBA::TCKind kind_new = tc_new->kind();
+    std::cout << " orig kind " << kind_new << ", " << get_id(tc) << std::endl;
+
+    assert(tc_old, tc_new, "Different!");
+
+    switch(kind_old)
+    {
     case CORBA::tk_struct:
     {
-        DynamicAny::DynStruct_var dyn_struct =
-	    DynamicAny::DynStruct::_narrow(a);
+        DynamicAny::DynStruct_var old_struct = DynamicAny::DynStruct::_narrow(a_old);
+	old_struct->rewind();
+        DynamicAny::DynStruct_var new_struct = DynamicAny::DynStruct::_narrow(a_new);
+	new_struct->rewind();
 
-        CORBA::ULong member_count = tc -> member_count();
-	ostr_ << "It's struct, members: " << member_count << " /// ";
-        for(CORBA::ULong i = 0 ; i < member_count ; i++)
+        CORBA::ULong old_member_count = old_struct->member_count();
+	//ostr_ << "It's struct, members: " << member_count << " /// ";
+        for( CORBA::ULong i = 0 ; i < old_member_count ; i++ )
 	{
-	    CORBA::String_var member_name = dyn_struct -> current_member_name();
-	    ostr_ << member_name << ", ";
-	    DynamicAny::DynAny_var component = dyn_struct -> current_component();
-	    std::cout << "field name: " << member_name << "    ";
-	    any_tree nested = get_tree(component, level+1);
-	    at.insert(at.end(), nested.begin(), nested.end());
-            //show_DynAny(component);
-            dyn_struct -> next();
+	    CORBA::String_var old_member_name = old_struct->current_member_name();
+	    new_struct->rewind();
+	    CORBA::ULong new_member_count = new_struct->member_count();
+	    for( CORBA::ULong j = 0; j < new_member_count; j++ )
+	    {
+		CORBA::String_var new_member_name = new_struct->current_member_name();
+		if( strcmp(old_member_name, new_member_name) != 0 )
+		    continue;
+		DynamicAny::DynAny_var old_component = old_struct->current_component();
+		DynamicAny::DynAny_var new_component = new_struct->current_component();
+		CORBA::TypeCode_var old_tc_component = old_component->type();
+		CORBA::TypeCode_var new_tc_component = new_component->type();
+		if( ! compare_tc(old_tc_component, new_tc_component) )
+		    continue;
+		fill_new1(new_component, old_component);
+		new_struct->next();
+	    }
+            old_struct -> next();
         }
+
+	break;
+    }
+
+    case CORBA::tk_long:
+    {
+        CORBA::Long t_ = a_old->get_long();
+	a_new->insert_long(t_);
+	break;
+    }
+
+    case CORBA::tk_string:
+    {
+        CORBA::String_var t_ = a_old->get_string();
+	a_new->insert_string(t_);
+	break;
+    }
+
+    case CORBA::tk_enum:
+    {
+	DynamicAny::DynEnum_var old_dyn_enum = DynamicAny::DynEnum::_narrow(a_old);
+	CORBA::String_var v_string = old_dyn_enum -> get_as_string();
+	DynamicAny::DynEnum_var new_dyn_enum = DynamicAny::DynEnum::_narrow(a_new);
+	new_dyn_enum->set_as_string(v_string);
+	break;
+    }
+
+    case CORBA::tk_sequence:
+    {
+        DynamicAny::DynSequence_var old_dyn_sequence = DynamicAny::DynSequence::_narrow(a_old);
+        DynamicAny::DynSequence_var new_dyn_sequence = DynamicAny::DynSequence::_narrow(a_new);
+
+	CORBA::TypeCode_var old_tc_ds = old_dyn_sequence->type();
+	CORBA::TypeCode_var new_tc_ds = new_dyn_sequence->type();
+	old_tc_ds = old_tc_ds->content_type();
+	new_tc_ds = new_tc_ds->content_type();
+	assert_ct(old_tc_ds, new_tc_ds);
+
+	CORBA::ULong ls = old_dyn_sequence->get_length();
+	new_dyn_sequence->set_length(ls);
+
+	old_dyn_sequence->rewind();
+	new_dyn_sequence->rewind();
+	for( CORBA::ULong i = 0; i < ls; ++i )
+	{
+	    DynamicAny::DynAny_var o = old_dyn_sequence->current_component();
+	    DynamicAny::DynAny_var n = new_dyn_sequence->current_component();
+	    fill_new1(n, o);
+	    old_dyn_sequence->next();
+	    new_dyn_sequence->next();
+	}
+	break;
+    }
+
+
+/*
+    case CORBA::tk_objref:
+    {
+        ostr_ << tc -> id();
+	CORBA::Object_ptr v_obj = a->get_reference();
+        if(CORBA::is_nil(v_obj))
+            ostr_ << "<NULL>";
+
+	break;
+    }
+
+    case CORBA::tk_short:
+    {
+        CORBA::Short v_short = a -> get_short();
+        ostr_ << v_short;
+
+	break;
+    }
+
+    case CORBA::tk_ushort:
+    {
+        CORBA::UShort v_ushort = a -> get_ushort();
+        ostr_ << v_ushort;
+
+	break;
+    }
+
+    case CORBA::tk_ulong:
+    {
+        CORBA::ULong v_ulong = a -> get_ulong();
+        ostr_ << v_ulong;
+
+	break;
+    }
+
+    case CORBA::tk_longlong:
+    {
+        CORBA::LongLong v_longlong = a -> get_longlong();
+        CORBA::String_var str = OB::LongLongToString(v_longlong);
+        ostr_ << str;
+
+	break;
+    }
+
+    case CORBA::tk_ulonglong:
+    {
+        CORBA::ULongLong v_ulonglong = a -> get_ulonglong();
+        CORBA::String_var str = OB::ULongLongToString(v_ulonglong);
+        ostr_ << str;
+
+	break;
+    }
+
+    case CORBA::tk_float:
+    {
+        CORBA::Float v_float = a -> get_float();
+        ostr_ << v_float;
+
+	break;
+    }
+
+    case CORBA::tk_double:
+    {
+        CORBA::Double v_double = a -> get_double();
+        ostr_ << v_double;
+
+	break;
+    }
+
+#if SIZEOF_LONG_DOUBLE >= 12
+    case CORBA::tk_longdouble:
+    {
+        CORBA::LongDouble v_longdouble = a -> get_longdouble();
+        //
+        // Not all platforms support this
+        //
+        //ostr_ << v_longdouble;
+        char str[64];
+        sprintf(str, "%31Lg", v_longdouble);
+        ostr_ << str;
+
+	break;
+    }
+#endif
+
+    case CORBA::tk_boolean:
+    {
+        CORBA::Boolean v_boolean = a -> get_boolean();
+        if(v_boolean == true)
+	    ostr_ << "TRUE";
+        else if(v_boolean == false)
+	    ostr_ << "FALSE";
+        else
+	    ostr_ << "UNKNOWN_BOOLEAN";
+
+	break;
+    }
+
+    case CORBA::tk_octet:
+    {
+        CORBA::Octet v_octet = a -> get_octet();
+        ostr_ << static_cast<int>(v_octet);
+
+	break;
+    }
+
+    case CORBA::tk_char:
+    {
+        CORBA::Char v_char = a -> get_char();
+        ostr_ << "'" << static_cast<char>(v_char) << "'";
+
+	break;
+    }
+
+    case CORBA::tk_wchar:
+    {
+        CORBA::WChar v_wchar = a -> get_wchar();
+	//
+	// Output of narrowed wchar to narrow stream
+	//
+	ostr_ << "'" << static_cast<char>(v_wchar) << "' - narrowed";
+
+	break;
+    }
+
+    case CORBA::tk_wstring:
+    {
+        CORBA::WString_var v_wstring = a -> get_wstring();
+	//
+	// Output of narrowed wstring to narrow stream
+	//
+	ostr_ << '"';
+	for (CORBA::ULong i=0; i < OB::wcslen(v_wstring); i++)
+	{
+	    ostr_ << static_cast<char>(v_wstring[i]);
+	}
+	ostr_ <<  '"' << " - narrowed";
+
+	break;
+    }
+
+    case CORBA::tk_TypeCode: {
+        CORBA::TypeCode_var v_tc = a -> get_typecode();
+        //show_name_TypeCode(v_tc);
+
+	break;
+    }
+
+    case CORBA::tk_any:
+    {
+        CORBA::Any_var v_any = a -> get_any();
+        //show_Any(v_any);
+	ostr_ << "It's ANY";
+	break;
+    }
+
+    case CORBA::tk_array:
+    {
+        DynamicAny::DynArray_var dyn_array = DynamicAny::DynArray::_narrow(a);
+        // for(i = 0 ; i < tc -> length() ; i++)
+	// {
+        //     if(i != 0) ostr_ << ", ";
+        //     DynAny_var component = dyn_array -> current_component();
+	//     show_DynAny(component);
+	//     dyn_array -> next();
+	// }
+	ostr_ << "It's Arrray, length: " << tc->length();
 
 	break;
     }
@@ -1170,6 +1564,7 @@ fill_new(DynamicAny::DynAny_ptr a_new, const any_tree& tree, DynamicAny::DynAny_
 
     // 	break;
     // }
+    */
 
     default:
     {
